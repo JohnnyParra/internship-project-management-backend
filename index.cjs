@@ -94,6 +94,7 @@ app.post('/register', async function (req, res) {
   }
 });
 
+// authenticates user when they log in
 app.post('/authenticate', async function (req, res) {
   try {
     console.log('ONE')
@@ -157,34 +158,41 @@ app.use(async function verifyJwt(req, res, next) {
   await next();
 });
 
-// GET request to http://localhost:8080/last-messages ends here
+// GET request to http://localhost:8080/tasks
 app.get('/tasks', async (req, res) => {
+  const [scheme, token] = req.headers.authorization.split(' ');
+  const user = jwt.verify(token, process.env.JWT_KEY)
+  console.log(user)
+
   try {
 
     const [tasks] = await req.db.query(`
-    SELECT messages.* FROM messages,  
-    (
-      SELECT from_user_id, max(date_time) AS date_time FROM messages GROUP BY from_user_id
-    ) last_message 
-    WHERE messages.from_user_id = last_message.from_user_id 
-    AND messages.date_time = last_message.date_time`);
-  
-      res.json({ lastMessages });
+      SELECT task_data FROM tasks
+      WHERE tasks.user_id = ${user.userId}`
+    );
+
+      res.json({ tasks, name: user.name });
   } catch (err) {
     console.log(err);
     res.json({ err });
   }
 });
 
+// POST request to http://localhost:8080/add-task ends here
 app.post('/add-task', async function (req, res) {
+  const [scheme, token] = req.headers.authorization.split(' ');
+  const user = jwt.verify(token, process.env.JWT_KEY)
+
   try {
 
     const [tasks] = await req.db.query(`
-      INSERT INTO tasks (user_id, task_data)
-      VALUES (:user_id, :task_data);
+      INSERT INTO tasks (user_id, task_data, group_data)
+      VALUES (${user.userId}, :task_data, :group_data)
+      ON DUPLICATE KEY
+      UPDATE task_data = :task_data, group_data = :group_data;
     `, {
-      user_id: req.body.user_id,
-      task_data: req.body.task_data
+      task_data: req.body.task_data,
+      group_data: req.body.group_data,
     });
 
   } catch (error) {
@@ -196,3 +204,12 @@ app.post('/add-task', async function (req, res) {
 app.listen(port, () => {
   console.log(`server started at http://localhost:${port}`);
 });
+
+
+  // const [tasks] = await req.db.query(`
+  // SELECT messages.* FROM messages,  
+  // (
+  //   SELECT from_user_id, max(date_time) AS date_time FROM messages GROUP BY from_user_id
+  // ) last_message 
+  // WHERE messages.from_user_id = last_message.from_user_id 
+  // AND messages.date_time = last_message.date_time`);
