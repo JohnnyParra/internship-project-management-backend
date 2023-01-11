@@ -56,7 +56,11 @@ app.use(async (req, res, next) => {
 app.post('/register', async function (req, res) {
   try {
     let encodedUser;
-
+    if(Object.values(req.body).indexOf('') > -1){
+      throw new Error('missing fields');
+    } else if(registerForm.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) == null){
+      throw new Error('Invalid Email');
+    }
     // Hashes the password and inserts the info into the `user` table
     await bcrypt.hash(req.body.password, 10).then(async hash => {
       try {
@@ -121,6 +125,10 @@ app.post('/authenticate', async function (req, res) {
   } catch (err) {
     console.log('Error in /authenticate', err)
   }
+});
+
+app.get('/user', async (req, res) => {
+  res.json({auth: true})
 });
 
 // Jwt verification checks to see if there is an authorization header with a valid jwt in it.
@@ -199,6 +207,11 @@ app.post('/add-task', async function (req, res) {
     console.log('error', error);
   };
 });
+
+app.delete('/delete-tasks', async function (req, res) {
+  const [scheme, token] = req.headers.authorization.split(' ');
+  const user = jwt.verify(token, process.env.JWT_KEY)
+})
 
 // Start the Express server
 app.listen(port, () => {
